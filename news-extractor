@@ -7,8 +7,8 @@ from datetime import datetime, timedelta, timezone
 import time
 
 # تنظیمات اتصال به تلگرام
-api_id = '27868015'
-api_hash = '463c9ad66cd28373687dae5ccf7b0d6b'
+api_id = ''
+api_hash = ''
 phone_number = '+93728558690'
 
 # لیست کانال‌های منبع و کانال مقصد
