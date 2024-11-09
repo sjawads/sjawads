@@ -1,0 +1,147 @@
+from telethon import TelegramClient, sync, types
+from fuzzywuzzy import fuzz
+import datetime
+import re
+import os
+from datetime import datetime, timedelta, timezone
+import time
+
+# تنظیمات اتصال به تلگرام
+api_id = '27868015'
+api_hash = '463c9ad66cd28373687dae5ccf7b0d6b'
+phone_number = '+93728558690'
+
+# لیست کانال‌های منبع و کانال مقصد
+source_channels = ['@HeratTimess', '@Newsof_Herat', '@tamadontv']
+destination_channel = '@AFGTNews'
+
+# لیست کانال‌هایی که می‌خواهید از متن پیام حذف شوند
+remove_channels = ['@HeratTimess | هرات تایمز', '@Newsof_Herat 👈خبرآنلاین هرات', '@tamadontv']
+
+# لیست عبارات یا کلماتی که می‌خواهید از متن پیام حذف شوند
+remove_phrases = ['هرات تایمز', 'خبرآنلاین هرات', 'لینک وب‌سایت', 'زنده | فیسبوک | وب‌ | x | یوتیوب | بعدازخبر | گفتاورد', '|']
+
+# فایل ذخیره پیام‌های ارسال‌شده
+sent_messages_file = "sent_messages.txt"
+
+# لینک کانال مقصد شما
+destination_link = "@AFGTNews"  # لینک کانال شما برای اضافه شدن به انتهای پیام
+
+# لیست کلمات کلیدی برای تشخیص تبلیغات
+ad_keywords = ['تبلیغ', 'اسپانسر', 'خرید', 'کلیک کنید', 'ارسال رایگان', 'فروش', 'شماره های تماس', 'تماس بگیرید', 'آدرس', 'لینک', 'سرخط', 'پیام شهروند', 'واتساپ', 'حمایت کنید', 'پښتو خبرونه', '#گفتاورد','جزئیات بیشتر']
+
+# تابع چک تبلیغات
+def is_advertisement(message):
+    for keyword in ad_keywords:
+        if keyword in message:
+            return True
+    return False
+
+# تابع ذخیره پیام‌های ارسال‌شده
+def save_sent_message(cleaned_message):
+    with open(sent_messages_file, "a", encoding="utf-8") as f:
+        f.write(f"{cleaned_message}\n")
+
+# تابع برای بررسی تکراری نبودن پیام
+def is_duplicate(message_text):
+    with open(sent_messages_file, "r", encoding="utf-8") as f:
+        for line in f:
+            if fuzz.partial_ratio(line.strip(), message_text) > 85:
+                return True
+    return False
+
+# تابع برای پاکسازی لینک، نام کانال‌ها و عبارات خاص از متن پیام
+def clean_message_content(message_text):
+    for channel in remove_channels:
+        message_text = re.sub(channel, '', message_text)
+    
+    message_text = re.sub(r'https?://\S+|www\.\S+', '', message_text)
+    
+    for phrase in remove_phrases:
+        message_text = message_text.replace(phrase, '')
+        
+    return message_text.strip()
+
+# تابع برای ارسال پیام‌های طولانی در پارت‌های مجزا با حفظ مرز کلمات
+def send_long_message(client, destination_channel, message_text):
+    max_length = 1024
+    parts = []
+    current_part = ""
+
+    for paragraph in message_text.split('\n'):
+        if len(current_part) + len(paragraph) + 1 > max_length:
+            parts.append(current_part.strip())
+            current_part = ""
+        
+        words = paragraph.split()
+        for word in words:
+            if len(current_part) + len(word) + 1 > max_length:
+                parts.append(current_part.strip())
+                current_part = ""
+            current_part += word + " "
+        
+        current_part += "\n"
+
+    if current_part:
+        parts.append(current_part.strip())
+
+    for part in parts:
+        if part != parts[-1]:
+            client.send_message(destination_channel, part.strip() + " ...")
+        else:
+            client.send_message(destination_channel, part.strip())  # بخش آخر بدون "..."
+        time.sleep(2)  # تأخیر 2 ثانیه‌ای بین پارت‌ها
+
+# تابع برای ارسال چندین رسانه همراه با پیام
+def send_media_with_message(client, destination_channel, message, message_text):
+    media_files = []
+    if isinstance(message.media, types.MessageMediaPhoto):
+        media_files.append(message.media)
+    elif isinstance(message.media, types.MessageMediaDocument) and message.file.mime_type.startswith("video"):
+        media_files.append(message.media)
+    elif message.grouped_id:
+        media_group = client.get_messages(message.chat_id, grouped_id=message.grouped_id)
+        for msg in media_group:
+            if isinstance(msg.media, (types.MessageMediaPhoto, types.MessageMediaDocument)):
+                media_files.append(msg.media)
+
+    for media in media_files:
+        client.send_message(destination_channel, file=media, message=message_text[:1024])
+        time.sleep(2)  # تأخیر بین ارسال هر رسانه
+
+# اتصال به تلگرام
+with TelegramClient('session_name', api_id, api_hash) as client:
+    client.connect()
+    if not client.is_user_authorized():
+        client.send_code_request(phone_number)
+        client.sign_in(phone_number, input('Please enter the code sent to your Telegram: '))
+
+    while True:  # حلقه اصلی برای بررسی اخبار جدید هر 30 دقیقه
+        twelve_hours_ago = datetime.now(timezone.utc) - timedelta(hours=12)
+
+        for source_channel in source_channels:
+            messages = client.get_messages(source_channel, limit=100)
+
+            for message in messages:
+                if message.date >= twelve_hours_ago:
+                    if message.message and not is_advertisement(message.message):
+                        cleaned_message = clean_message_content(message.message)
+
+                        if not is_duplicate(cleaned_message):
+                            final_message = f"{cleaned_message}\n\nبرای اخبار بیشتر: {destination_link}"
+                            
+                            if message.media:
+                                send_media_with_message(client, destination_channel, message, final_message)
+                            else:
+                                if len(final_message) > 1024:
+                                    send_long_message(client, destination_channel, final_message)
+                                else:
+                                    client.send_message(destination_channel, final_message)
+
+                            save_sent_message(cleaned_message)
+                            print(f"Forwarded message from {source_channel}: {cleaned_message}")
+
+                            time.sleep(2)  # تأخیر 2 ثانیه‌ای بین ارسال پیام‌ها
+
+        print("All recent news sent successfully. Checking again in 15 minutes.")
+        time.sleep(900)  # تأخیر 15 دقیقه‌ای برای بررسی دوباره
