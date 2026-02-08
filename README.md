@@ -15,6 +15,7 @@ multi-user accounting system tailored to Barchelan workflows.
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python barchelan/manage.py makemigrations accounting
 python barchelan/manage.py migrate
 python barchelan/manage.py createsuperuser
 python barchelan/manage.py runserver
@@ -29,6 +30,7 @@ ledger entries.
 py -m venv .venv
 .\\.venv\\Scripts\\Activate.ps1
 pip install -r requirements.txt
+python barchelan/manage.py makemigrations accounting
 python barchelan/manage.py migrate
 python barchelan/manage.py createsuperuser
 python barchelan/manage.py runserver
