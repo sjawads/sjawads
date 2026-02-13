@@ -1,0 +1,3 @@
+'use client';
+import { useEffect, useState } from 'react';
+export default function PortsPage() { const [rows,setRows]=useState<any[]>([]); const [name,setName]=useState(''); const [supplierAccountId,setSupplier]=useState(''); const load=async()=>setRows(await (await fetch('/api/ports')).json()); useEffect(()=>{load();},[]); return <main><h2>Ports</h2><input placeholder='name' onChange={e=>setName(e.target.value)} /><input placeholder='supplierAccountId' onChange={e=>setSupplier(e.target.value)} /><button onClick={async()=>{await fetch('/api/ports',{method:'POST',body:JSON.stringify({name,supplierAccountId:Number(supplierAccountId)})});load();}}>Create</button><pre>{JSON.stringify(rows,null,2)}</pre></main>; }

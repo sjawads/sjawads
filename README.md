@@ -1,31 +1,51 @@
-# Bar Chalan Online Accounting System
+# Tanker Accounting Web App (MVP)
 
-این ریپازیتوری شامل اسکلت اولیه‌ی یک سیستم حسابداری آنلاین برای بارچالانی است. پیاده‌سازی با Django انجام شده و مدل‌های اصلی مطابق نیازهای مطرح‌شده ساخته شده‌اند.
+Next.js 14.2 + TypeScript + Prisma + PostgreSQL implementation of tanker accounting with contracts, invoices, tanker rows, payments/exchange, in-kind, reports, and printable invoice views.
 
-## امکانات کلیدی (نسخه اولیه)
-- مدیریت کاربران (از طریق Django Admin)
-- حساب‌ها و نوع حساب‌ها
-- قراردادها با سه روش محاسبه
-- فاکتور و جزئیات تانکرها
-- داد و گرفت‌ها (Ledger)
-- پشتیبانی از ارز AFN و USD
+## Stack
+- Next.js App Router (`next@14.2.5`, stable webpack dev)
+- TypeScript
+- PostgreSQL
+- Prisma ORM
+- Docker Compose (db + app)
 
-## راه‌اندازی
+## 1) Local setup (without Docker)
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python bar_chalan_accounting/manage.py migrate
-python bar_chalan_accounting/manage.py createsuperuser
-python bar_chalan_accounting/manage.py runserver
+cp .env.example .env
+npm install
+npx prisma migrate dev --name init
+npx prisma db seed
+npm run dev
 ```
 
-## ساختار پروژه
-- `bar_chalan_accounting/` پروژه Django
-- `bar_chalan_accounting/accounting/` اپلیکیشن اصلی حسابداری
+## 2) Docker setup (dev)
+```bash
+docker compose up -d db
+cp .env.example .env
+npm install
+npx prisma migrate dev --name init
+npx prisma db seed
+npm run dev
+```
 
-## قدم‌های بعدی پیشنهادی
-- افزودن API با Django REST Framework
-- پیاده‌سازی گزارش‌های سود و زیان و مانده حساب
-- اضافه کردن نمایش تاریخ شمسی در UI
-- طراحی فرانت‌اند حرفه‌ای
+Or run full app+db in compose:
+```bash
+docker compose up --build
+```
+
+## 3) Production (Docker)
+```bash
+docker build -t tanker-accounting .
+docker run -p 3000:3000 --env-file .env tanker-accounting
+```
+
+## Core routes
+- `/accounts`, `/products`, `/ports`, `/contracts`
+- `/invoices/:id` (batch tanker paste/upsert + finalize)
+- `/transactions`, `/in-kind`
+- `/invoices/:id/print`
+- `/api/invoices/:id/print.pdf` (HTML placeholder endpoint for puppeteer wiring)
+
+## Seed data
+- Roles: Admin, Accountant, DataEntry, Viewer
+- Money accounts: Sarafi_AFN, Sarafi_USD
