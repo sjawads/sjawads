@@ -18,6 +18,9 @@ npx prisma db seed
 npm run dev
 ```
 
+> Note: `npm run build` now runs `prisma generate` automatically via `prebuild`, preventing missing Prisma enum/client types during Docker and CI builds.
+
+
 ## 2) Docker setup (dev)
 ```bash
 docker compose up -d db
@@ -27,6 +30,8 @@ npx prisma migrate dev --name init
 npx prisma db seed
 npm run dev
 ```
+
+
 
 Or run full app+db in compose:
 ```bash
