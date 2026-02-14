@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Currency { AFN USD }
+enum AccountType { CUSTOMER SUPPLIER MONEY OTHER }
+enum CalcType { COST COST_USD PER_TON }
+enum InvoiceStatus { DRAFT FINAL CANCELED }
+enum TonBasis { PRODUCT BILL }
+enum Direction { IN OUT }
+
+model Account {
+  id          Int       @id @default(autoincrement())
+  name        String
+  accountType AccountType
+  currency    Currency?
+  isActive    Boolean   @default(true)
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  ports           Port[]
+  customerContracts Contract[] @relation("CustomerContracts")
+}
+
+model Port {
+  id                Int      @id @default(autoincrement())
+  name              String
+  supplierAccountId Int
+  supplierAccount   Account  @relation(fields: [supplierAccountId], references: [id])
+}
+
+model Product {
+  id       Int     @id @default(autoincrement())
+  name     String
+  isActive Boolean @default(true)
+}
+
+model Contract {
+  id                Int      @id @default(autoincrement())
+  customerAccountId Int
+  productId         Int
+  contractCode      String   @unique
+  calcType          CalcType
+  perTonAfnDefault  Decimal?
+  perTonUsdDefault  Decimal?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customerAccount Account @relation("CustomerContracts", fields: [customerAccountId], references: [id])
+  product         Product @relation(fields: [productId], references: [id])
+  invoices        Invoice[]
+}
+
+model Invoice {
+  id                    Int          @id @default(autoincrement())
+  contractId            Int
+  invoiceSeq            Int
+  invoiceNo             String       @unique
+  invoiceDate           DateTime
+  description           String?
+  status                InvoiceStatus @default(DRAFT)
+  tankerCountFinal      Int?
+  totalCustomerAfnFinal Decimal? @db.Decimal(18, 4)
+  totalCustomerUsdFinal Decimal? @db.Decimal(18, 4)
+  totalInKindFinal      Decimal? @db.Decimal(18, 4)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  tankers  Tanker[]
+
+  @@unique([contractId, invoiceSeq])
+}
+
+model Tanker {
+  id Int @id @default(autoincrement())
+  invoiceId Int
+  contractId Int
+  portId Int
+  supplierAccountId Int
+  productWeight Decimal @db.Decimal(18, 4)
+  billWeight Decimal @db.Decimal(18, 4)
+  tonBasis TonBasis
+  exchangeRate Decimal? @db.Decimal(18, 6)
+  perTonAfn Decimal? @db.Decimal(18, 4)
+  perTonUsd Decimal? @db.Decimal(18, 4)
+
+  mahsuli Decimal @default(0) @db.Decimal(18, 4)
+  fawaed Decimal @default(0) @db.Decimal(18, 4)
+  fm60 Decimal @default(0) @db.Decimal(18, 4)
+  fm20 Decimal @default(0) @db.Decimal(18, 4)
+  qualityControl Decimal @default(0) @db.Decimal(18, 4)
+  dozbolaghCustomer Decimal @default(0) @db.Decimal(18, 4)
+  dozbolaghSupplier Decimal @default(0) @db.Decimal(18, 4)
+  freightAfnCustomer Decimal @default(0) @db.Decimal(18, 4)
+  freightAfnSupplier Decimal @default(0) @db.Decimal(18, 4)
+  miscAfnCustomer Decimal @default(0) @db.Decimal(18, 4)
+  miscAfnSupplier Decimal @default(0) @db.Decimal(18, 4)
+  jawazCommissionCustomer Decimal @default(0) @db.Decimal(18, 4)
+  jawazCommissionSupplier Decimal @default(0) @db.Decimal(18, 4)
+  freightUsdCustomer Decimal @default(0) @db.Decimal(18, 4)
+  freightUsdSupplier Decimal @default(0) @db.Decimal(18, 4)
+  miscUsdCustomer Decimal @default(0) @db.Decimal(18, 4)
+  miscUsdSupplier Decimal @default(0) @db.Decimal(18, 4)
+
+  customerDebtAfnCalc Decimal @default(0) @db.Decimal(18, 4)
+  customerDebtUsdCalc Decimal @default(0) @db.Decimal(18, 4)
+  customerInKindCalc Decimal @default(0) @db.Decimal(18, 4)
+  supplierRecvAfnCalc Decimal @default(0) @db.Decimal(18, 4)
+  supplierRecvUsdCalc Decimal @default(0) @db.Decimal(18, 4)
+
+  customerDebtAfnFinal Decimal? @db.Decimal(18, 4)
+  customerDebtUsdFinal Decimal? @db.Decimal(18, 4)
+  customerInKindFinal Decimal? @db.Decimal(18, 4)
+  supplierRecvAfnFinal Decimal? @db.Decimal(18, 4)
+  supplierRecvUsdFinal Decimal? @db.Decimal(18, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+}
+
+model TransactionHeader {
+  id Int @id @default(autoincrement())
+  date DateTime
+  partyAccountId Int?
+  contractId Int?
+  invoiceId Int?
+  note String?
+  exchangeRate Decimal? @db.Decimal(18, 6)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lines TransactionLine[]
+}
+
+model TransactionLine {
+  id Int @id @default(autoincrement())
+  transactionId Int
+  moneyAccountId Int
+  direction Direction
+  amount Decimal @db.Decimal(18, 4)
+  createdAt DateTime @default(now())
+
+  transaction TransactionHeader @relation(fields: [transactionId], references: [id])
+}
+
+model InKindTransaction {
+  id Int @id @default(autoincrement())
+  date DateTime
+  customerAccountId Int
+  contractId Int?
+  invoiceId Int?
+  productId Int?
+  qty Decimal @db.Decimal(18, 4)
+  direction Direction
+  note String?
+  createdAt DateTime @default(now())
+}
+
+model Role {
+  id Int @id @default(autoincrement())
+  name String @unique
+  permissions RolePermission[]
+  users User[]
+}
+
+model User {
+  id Int @id @default(autoincrement())
+  username String @unique
+  passwordHash String
+  roleId Int
+  isActive Boolean @default(true)
+  role Role @relation(fields: [roleId], references: [id])
+}
+
+model RolePermission {
+  id Int @id @default(autoincrement())
+  roleId Int
+  permissionKey String
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([roleId, permissionKey])
+}
